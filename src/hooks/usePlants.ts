@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import type { Plant, PlantCategory } from "@/data/plants";
+
+type PlantRow = Database["public"]["Tables"]["plants"]["Row"];
 
 const defaultCare = {
   light: "Bright, indirect light works best for most conditions.",
@@ -11,12 +14,14 @@ const defaultCare = {
   fertilizer: "Feed monthly during the growing season.",
 };
 
-const mapRow = (r: any): Plant => {
+const mapRow = (r: PlantRow): Plant => {
   const image = r.image_url || "";
-  const gallery: string[] = Array.isArray(r.gallery) && r.gallery.length > 0
-    ? r.gallery
+  const galleryField = Array.isArray(r.gallery) ? (r.gallery as string[]) : [];
+  const gallery: string[] = galleryField.length > 0
+    ? galleryField
     : [image, image, image, image];
-  const care = { ...defaultCare, ...(r.care || {}) };
+  const care = { ...defaultCare, ...((r.care as Record<string, string>) || {}) };
+  // ...rest unchanged
   return {
     id: r.id,
     name: r.name,
