@@ -9,31 +9,32 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Edit, Trash2, Upload } from "lucide-react";
 import { PLANT_CATEGORIES, CATEGORY_META, PlantCategory } from "@/data/plants";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
 
+type PlantRow = Database["public"]["Tables"]["plants"]["Row"];
+type PlantDifficulty = Database["public"]["Enums"]["plant_difficulty"];
 
-type Plant = {
-  id: string;
-  name: string;
-  species: string;
-  description: string;
-  price: number;
+type Plant = Omit<PlantRow, "gallery" | "care" | "category" | "difficulty"> & {
   category: PlantCategory;
-  difficulty: "Easy" | "Moderate" | "Expert";
-  size: string | null;
-  light: string | null;
-  water: string | null;
-  pet_friendly: boolean;
-  image_url: string;
+  difficulty: PlantDifficulty;
   gallery: string[];
   care: Record<string, string>;
-  in_stock: boolean;
 };
+
+const mapRow = (r: PlantRow): Plant => ({
+  ...r,
+  category: r.category as PlantCategory,
+  difficulty: r.difficulty,
+  gallery: Array.isArray(r.gallery) ? (r.gallery as string[]) : [],
+  care: (r.care as Record<string, string>) ?? {},
+});
+
 
 const empty: Plant = {
   id: "", name: "", species: "", description: "", price: 0,
-  category: "indoor", difficulty: "Easy", size: "", light: "", water: "",
+  category: "indoor", difficulty: "Easy" as PlantDifficulty, size: "", light: "", water: "",
   pet_friendly: false, image_url: "", gallery: [], care: {}, in_stock: true,
-};
+} as Plant;
 
 const PlantsAdmin = () => {
   const [plants, setPlants] = useState<Plant[]>([]);
@@ -43,7 +44,7 @@ const PlantsAdmin = () => {
 
   const load = async () => {
     const { data } = await supabase.from("plants").select("*").order("name");
-    setPlants((data as any) ?? []);
+    setPlants(((data as PlantRow[]) ?? []).map(mapRow));
   };
   useEffect(() => { load(); }, []);
 
@@ -55,8 +56,8 @@ const PlantsAdmin = () => {
     }
     const payload = { ...editing, price: Number(editing.price), gallery: editing.gallery, care: editing.care };
     const { error } = isNew
-      ? await supabase.from("plants").insert(payload as any)
-      : await supabase.from("plants").update(payload as any).eq("id", editing.id);
+      ? await supabase.from("plants").insert(payload as Database["public"]["Tables"]["plants"]["Insert"])
+      : await supabase.from("plants").update(payload as Database["public"]["Tables"]["plants"]["Update"]).eq("id", editing.id);
     if (error) { toast.error(error.message); return; }
     toast.success(isNew ? "Plant created" : "Plant updated");
     setEditing(null); setIsNew(false); load();
@@ -174,8 +175,7 @@ const PlantsAdmin = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium block mb-1">Difficulty</label>
-                  <select className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm" value={editing.difficulty} onChange={(e) => setEditing({ ...editing, difficulty: e.target.value as any })}>
-                    <option>Easy</option><option>Moderate</option><option>Expert</option>
+                  <select className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm" value={editing.difficulty} onChange={(e) => setEditing({ ...editing, difficulty: e.target.value as PlantDifficulty })}>                     <option>Easy</option><option>Moderate</option><option>Expert</option>
                   </select>
                 </div>
                 <div>
